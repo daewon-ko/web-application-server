@@ -11,6 +11,7 @@ import java.awt.print.Pageable;
 import java.io.*;
 import java.net.Socket;
 import java.nio.file.Files;
+import java.util.Collection;
 import java.util.Map;
 
 public class RequestHandler extends Thread {
@@ -47,6 +48,8 @@ public class RequestHandler extends Thread {
             String[] tokens = line.split(" ");
 
 
+            boolean isLogined = false;
+
             int contentLength = 0;
             while (!line.equals("")) {
                 line = br.readLine();
@@ -55,6 +58,10 @@ public class RequestHandler extends Thread {
                 if (line.contains("Content-Length")) {
                     contentLength = Integer.parseInt(line.split(": ")[1]);
                     log.debug("ContentLength : {}", contentLength);
+                }
+
+                if (line.contains("Cookie")){
+                   isLogined = isLogin(line);
                 }
             }
 
@@ -100,6 +107,27 @@ public class RequestHandler extends Thread {
                     responseResource(out, "/user/login_failed.html");
                 }
 
+            } else if("/user/list".equals(url)) {
+                if (!isLogined){
+                    responseResource(out, "/user/login_failed.html");
+                    return;
+                }
+                Collection<User> all = DataBase.findAll();
+
+                StringBuilder sb = new StringBuilder();
+                sb.append("<table border='1'>");
+                for (User user : all) {
+                    sb.append("<tr>");
+                    sb.append("<td>" + user.getUserId() + "</td>");
+                    sb.append("<td>" + user.getName() + "</td>");
+                    sb.append("<td>" + user.getEmail() + "</td>");
+                    sb.append("</tr>");
+                }
+                sb.append("</table>");
+                byte[] body = sb.toString().getBytes();
+                DataOutputStream dos = new DataOutputStream(out);
+                response200Header(dos, body.length);
+                responseBody(dos, body);
             }
             else{
                 responseResource(out, url);
@@ -163,5 +191,16 @@ public class RequestHandler extends Thread {
         } catch (IOException e) {
             log.error(e.getMessage());
         }
+    }
+
+    private boolean isLogin(String line){
+        String[] headerTokens = line.split(":");
+
+        Map<String, String> cookies = HttpRequestUtils.parseCookies(headerTokens[1].trim());
+        String value = cookies.get("logined");
+        if (value == null) {
+            return false;
+        }
+        return value.equals(value);
     }
 }
