@@ -4,6 +4,7 @@ import model.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import util.HttpRequestUtils;
+import util.IOUtils;
 
 import java.io.*;
 import java.net.Socket;
@@ -33,18 +34,38 @@ public class RequestHandler extends Thread {
             log.debug("request Line : {}", line); // 요청라인
 
 
+
+
             if (line == null) {
                 return;
             }
+
+
+
             String[] tokens = line.split(" ");
+
+
+            int contentLength = 0;
+            while (!line.equals("")) {
+                line = br.readLine();
+                log.debug("header : {}", line);
+
+                if (line.contains("Content-Length")) {
+                    contentLength = Integer.parseInt(line.split(": ")[1]);
+                    log.debug("ContentLength : {}", contentLength);
+                }
+            }
+
+
 
             String url = tokens[1];
 
             if (url.startsWith("/user/create")){
                 int from = url.indexOf("?");
-                String queryString = url.substring(from + 1);
 
-                Map<String, String> queryStringMap = HttpRequestUtils.parseQueryString(queryString);
+
+                String body = IOUtils.readData(br, contentLength);
+                Map<String, String> queryStringMap = HttpRequestUtils.parseQueryString(body);
 
                 User user = new User(queryStringMap.get("userId"),
                         queryStringMap.get("password"),
@@ -55,10 +76,6 @@ public class RequestHandler extends Thread {
 
             }
 
-            while (!line.equals("")) {
-                line = br.readLine();
-                log.debug("header : {}", line);
-            }
 
             DataOutputStream dos = new DataOutputStream(out);
 
